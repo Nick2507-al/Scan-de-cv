@@ -1,0 +1,47 @@
+📜 Licence d’Évaluation — CVMatch
+
+Objet :
+
+Le présent logiciel (« CVMatch ») est mis à disposition du destinataire uniquement dans le cadre d’une évaluation technique interne.
+Aucun droit d’exploitation commerciale n’est accordé par cette licence.
+
+Droits accordés :
+
+Le destinataire est autorisé à :
+
+installer et exécuter le logiciel en local,
+
+consulter le code source à des fins de test et de validation technique,
+
+utiliser le logiciel exclusivement pour une démonstration interne ou une vérification de faisabilité.
+
+Restrictions :
+
+Le destinataire s’interdit formellement de :
+
+copier, partager, publier ou redistribuer le logiciel,
+
+utiliser le logiciel dans un environnement de production ou pour fournir un service à des tiers,
+
+modifier, dériver ou intégrer le code dans un autre projet sans accord écrit de l’auteur,
+
+tenter de contourner les mesures de protection mises en place.
+
+Propriété intellectuelle :
+
+Le logiciel et l’intégralité de son code source restent la propriété exclusive de l’auteur.
+Aucun droit de propriété intellectuelle, brevet, marque ou droit d’auteur n’est transféré au destinataire.
+
+Durée :
+
+Cette licence est accordée pour une durée de 30 jours à compter de la mise à disposition du logiciel, sauf prolongation écrite par l’auteur.
+À l’expiration de cette période, toute utilisation doit cesser immédiatement sauf signature d’un accord commercial.
+
+Résiliation :
+
+L’auteur se réserve le droit de résilier cette licence à tout moment en cas de non-respect des conditions ci-dessus.
+En cas de résiliation, le destinataire doit supprimer toute copie du logiciel et cesser immédiatement son utilisation.
+
+
+Auteur : HIRWA Jean Baptiste
+Date : 19/08/2025

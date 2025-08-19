@@ -1,0 +1,116 @@
+CVMatch – Documentation client (fonctionnelle & prise en main)
+
+1. Présentation
+
+CVMatch est une application d’aide au recrutement qui permet :
+- d’analyser la pertinence d’un CV par rapport à une offre d’emploi (similarité sémantique)
+- de générer des contenus (résumés, conseils, messages) via une IA locale (Ollama)
+- de gérer des entités métier (utilisateurs, offres, candidatures, entreprises) avec authentification JWT
+
+Pile technique :
+- Frontend: React (Create React App), port 3000
+- Backend: FastAPI (Uvicorn), port 8000
+- Base de données: MySQL (vide au départ ; schéma proposé)
+- IA locale: Ollama (modèle mistral)
+
+2. Pré-requis d’installation
+- Node.js ≥ 18 et npm
+- Python ≥ 3.10 et pip
+- MySQL Server ≥ 8.0
+- Ollama installé et démarré (http://127.0.0.1:11434)
+
+3. Configuration de l’environnement
+- Fichier d’exemple: cvmatch-backend/.env.example
+- Copiez-le en cvmatch-backend/.env puis renseignez :
+  - OLLAMA_HOST, OLLAMA_MODEL (ex: mistral:latest)
+  - DB_HOST, DB_PORT (3306), DB_USER, DB_PASSWORD, DB_NAME (ex: cvmatch_db)
+  - SECRET_KEY (valeur longue et aléatoire), ACCESS_TOKEN_EXPIRE_MINUTES (ex: 30)
+  - Optionnels: MAKE_WEBHOOK_URL, SMTP_HOST/PORT/USER/PASSWORD, SMTP_TLS, SMTP_SSL
+- Ne commitez pas le fichier .env
+
+4. Installation et lancement (résumé)
+Backend (dans cvmatch-backend) :
+- python -m venv env
+- Activer l’environnement
+- pip install -r requirements.txt
+- uvicorn main:app --reload --port 8000
+- Tester Swagger: http://localhost:8000/docs
+
+Frontend (dans cvmatch-frontend) :
+- npm install
+- npm start (http://localhost:3000)
+
+MySQL :
+- Créer la base: CREATE DATABASE cvmatch_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+- (Optionnel) Importer le schéma: mysql -u root -p cvmatch_db < cvmatch-backend/database_schema.sql
+
+Ollama :
+- ollama pull mistral:latest
+- Vérifier: http://127.0.0.1:11434/api/tags
+
+5. Fonctionnalités à tester (checklist)
+A. IA et analyse de CV
+- [ ] Génération IA : via Swagger /chat (ou /generate), body JSON {"message": "Ex: rédige un résumé de CV développeur React"}
+- [ ] Analyse de CV : via Swagger /analyze, télécharger un fichier CV (pdf/doc/docx) + saisir l’offre (champ offer)
+  - Résultat: score (%) + conseil
+
+B. Authentification & utilisateurs
+- [ ] Inscription : POST /auth/register (prénom, nom, email, mot_de_passe, type_utilisateur)
+- [ ] Connexion : POST /auth/login (recoit access_token)
+- [ ] Profil : GET /auth/me (avec Bearer token)
+
+C. Offres, candidatures, entreprises (exemples)
+- [ ] Offres : CRUD basique via /offers (création, liste, lecture, mise à jour, suppression)
+- [ ] Candidatures : via /applications (dépôt, fichiers, statut)
+- [ ] Entreprises : via /companies (fiche, logo, documents)
+
+D. Notifications, stats et exports
+- [ ] Notifications : /notifications (création/lecture selon implémentation)
+- [ ] Statistiques : /stats (inclut export PDF, StreamingResponse)
+
+6. Éléments clés à connaître
+- CORS : la politique CORS est ouverte pour les tests locaux
+- IA locale : le backend appelle d’abord /api/chat d’Ollama puis bascule sur /api/generate pour compatibilité
+- Similarité sémantique : sentence-transformers (paraphrase-MiniLM-L6-v2) calcule un score de pertinence CV ↔ offre
+- Lecture de documents : PDF via PyMuPDF (fitz), DOC/DOCX via python-docx
+- JWT : création/validation via SECRET_KEY et expirations via ACCESS_TOKEN_EXPIRE_MINUTES (utils/auth.py)
+- Emails (optionnel) : utils/emailer.py utilise SMTP_* si fournis ; sinon les fonctionnalités d’email sont inopérantes
+- Frontend → Backend : URL API définie dans cvmatch-frontend/src/api.ts (http://localhost:8000)
+
+7. Dépannage rapide
+- Ports occupés :
+  - Backend : changer --port côté uvicorn et adapter src/api.ts du frontend
+  - Frontend : CRA propose un autre port
+- MySQL : vérifier identifiants du .env et disponibilité du serveur
+- Ollama : vérifier service actif, OLLAMA_HOST correct et modèle téléchargé (mistral:latest)
+- .env : doit être au chemin cvmatch-backend/.env et conforme au .env.example
+
+8. Dépendances Python (requirements.txt) – complet
+Le fichier cvmatch-backend/requirements.txt a été vérifié et complété pour inclure toutes les bibliothèques nécessaires mentionnées dans le code :
+- fastapi==0.104.1
+- uvicorn==0.24.0
+- python-multipart==0.0.6
+- sentence-transformers==2.2.2
+- torch>=2.0.0 (requis par sentence-transformers)
+- PyMuPDF==1.23.8
+- python-docx==1.1.0
+- openai==1.3.7
+- requests==2.32.3
+- python-dotenv==1.0.0
+- reportlab==4.0.7
+- mysql-connector-python==8.2.0
+- PyJWT==2.9.0
+- passlib[bcrypt]==1.7.4
+- email-validator==2.2.0
+
+Remarques :
+- torch : si l’installation échoue selon votre plateforme, référez-vous à la documentation officielle de PyTorch pour choisir la commande adaptée (CPU/GPU, CUDA/ROCm).
+- openai : utilisé uniquement pour un script de test facultatif. Vous pouvez le laisser installé ou le retirer si inutile.
+
+9. Sécurité et bonnes pratiques
+- Ne commitez jamais le fichier .env
+- Utilisez un SECRET_KEY fort
+- Limitez les comptes MySQL de développement
+- Restreignez le CORS en production
+
+Fin de la documentation.
