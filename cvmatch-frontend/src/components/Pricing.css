@@ -1,0 +1,145 @@
+.pricing {
+  padding: 80px 20px;
+  text-align: center;
+  background-color: #f9fafb;
+}
+
+.pricing-title {
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.pricing-subtitle {
+  font-size: 1.1rem;
+  color: #6b7280;
+  margin-bottom: 50px;
+  max-width: 700px;
+  margin: 0 auto 50px;
+}
+
+.pricing-cards {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.pricing-card {
+  background: white;
+  border-radius: 20px;
+  padding: 35px 25px;
+  width: 300px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  animation: fadeUp 0.6s ease forwards;
+  opacity: 0;
+}
+
+.pricing-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #e0e0ff, #dbdbff, #e1edfa);
+}
+
+.pricing-card h3 {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.price {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 20px 0;
+}
+
+.price span {
+  font-size: 1rem;
+  color: #6b7280;
+}
+
+.pricing-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 30px;
+  text-align: left;
+}
+
+.pricing-card ul li {
+  margin: 12px 0;
+  color: #374151;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+}
+
+.check-icon {
+  color: #10b981;
+  margin-right: 8px;
+}
+
+/* Carte en vedette */
+.featured {
+  background: linear-gradient(135deg, #6366f1, #0000ff, #1e90ff);
+  color: white;
+}
+
+.featured ul li {
+  color: white;
+}
+
+.featured .check-icon {
+  color: white;
+}
+
+/* Boutons */
+.btn {
+  padding: 12px 25px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1, #1e90ff);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(99,102,241,0.4);
+}
+
+.btn-white {
+  background: white;
+  color: #1e40af;
+}
+
+.btn-white:hover {
+  background: #f3f4f6;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(255,255,255,0.3);
+}
+
+/* Animation apparition */
+@keyframes fadeUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pricing-cards {
+    flex-direction: column;
+    align-items: center;
+  }
+}
