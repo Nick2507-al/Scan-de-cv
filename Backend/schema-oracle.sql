@@ -1,0 +1,47 @@
+-- Schéma Oracle pour l'application Genesis (analyse CV)
+-- Compatible Oracle 11g XE (séquence + trigger pour l'ID)
+-- Exécuter avec un utilisateur ayant les droits CREATE TABLE, CREATE SEQUENCE, CREATE TRIGGER
+
+-- Séquence pour l'ID des candidats (Oracle 11g n'a pas IDENTITY)
+CREATE SEQUENCE CANDIDATES_SEQ START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
+
+-- Table des candidats (résultats d'analyse + notes recruteur)
+CREATE TABLE CANDIDATES (
+  ID           NUMBER PRIMARY KEY,
+  NAME         VARCHAR2(500),
+  EMAIL        VARCHAR2(500),
+  PHONE        VARCHAR2(100),
+  SKILLS       CLOB,
+  ORGANIZATIONS CLOB,
+  FILENAME     VARCHAR2(500),
+  RETAINED     NUMBER(1) DEFAULT 0,
+  IMPROVEMENT_NOTES CLOB,
+  RECRUITER_NOTES   CLOB,
+  CREATED_AT   DATE DEFAULT SYSDATE
+);
+
+-- Trigger pour remplir ID automatiquement
+CREATE OR REPLACE TRIGGER CANDIDATES_BI
+  BEFORE INSERT ON CANDIDATES
+  FOR EACH ROW
+  WHEN (NEW.ID IS NULL)
+BEGIN
+  SELECT CANDIDATES_SEQ.NEXTVAL INTO :NEW.ID FROM DUAL;
+END;
+/
+
+-- Table de configuration dashboard (objectifs, libellés)
+CREATE TABLE DASHBOARD_CONFIG (
+  CONFIG_KEY   VARCHAR2(100) PRIMARY KEY,
+  CONFIG_VALUE VARCHAR2(4000)
+);
+
+-- Valeurs par défaut pour le dashboard
+INSERT INTO DASHBOARD_CONFIG (CONFIG_KEY, CONFIG_VALUE) VALUES ('objectif_mensuel', '500');
+INSERT INTO DASHBOARD_CONFIG (CONFIG_KEY, CONFIG_VALUE) VALUES ('evolution_cv_analyses_pct', '15.5');
+INSERT INTO DASHBOARD_CONFIG (CONFIG_KEY, CONFIG_VALUE) VALUES ('evolution_en_attente_pct', '-3.2');
+COMMIT;
+
+-- Index pour les requêtes courantes
+CREATE INDEX IDX_CANDIDATES_CREATED ON CANDIDATES(CREATED_AT);
+CREATE INDEX IDX_CANDIDATES_RETAINED ON CANDIDATES(RETAINED);

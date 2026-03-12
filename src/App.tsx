@@ -1,6 +1,6 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
-import SignIn from "./pages/AuthPages/SignIn";
-import SignUp from "./pages/AuthPages/SignUp";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
+import Connexion from "./pages/Auth/Connexion";
+import Inscription from "./pages/Auth/Inscription";
 import NotFound from "./pages/OtherPage/NotFound";
 import UserProfiles from "./pages/UserProfiles";
 import Videos from "./pages/UiElements/Videos";
@@ -18,6 +18,11 @@ import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import Analyse from "./pages/Dashboard/analyse";
+import Management from "./pages/Dashboard/management";
+import Offers from "./pages/Dashboard/Offers";
+import CandidateDetail from "./pages/Dashboard/CandidateDetail";
 
 export default function App() {
   return (
@@ -25,9 +30,23 @@ export default function App() {
       <Router>
         <ScrollToTop />
         <Routes>
-          {/* Dashboard Layout */}
-          <Route element={<AppLayout />}>
+          <Route path="/connexion" element={<Connexion />} />
+          <Route path="/inscription" element={<Inscription />} />
+          <Route path="/signin" element={<Navigate to="/connexion" replace />} />
+          <Route path="/signup" element={<Navigate to="/inscription" replace />} />
+          {/* Dashboard Layout : protégé par authentification */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index path="/" element={<Home />} />
+            <Route path="/analyse" element={<Analyse />} />
+            <Route path="/management" element={<Management />} />
+            <Route path="/offres" element={<Offers />} />
+            <Route path="/candidates/:id" element={<CandidateDetail />} />
 
             {/* Others Page */}
             <Route path="/profile" element={<UserProfiles />} />
@@ -53,11 +72,6 @@ export default function App() {
             <Route path="/bar-chart" element={<BarChart />} />
           </Route>
 
-          {/* Auth Layout */}
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
-
-          {/* Fallback Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>

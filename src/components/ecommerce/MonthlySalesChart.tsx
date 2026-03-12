@@ -3,18 +3,17 @@ import { ApexOptions } from "apexcharts";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { MoreDotIcon } from "../../icons";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchApi } from "../../api/config";
 
-export default function MonthlySalesChart() {
+export default function MonthlyCVAnalysisChart() {
   const options: ApexOptions = {
-    colors: ["#465fff"],
+    colors: ["#465fff"], // couleur thème, tu peux adapter
     chart: {
       fontFamily: "Outfit, sans-serif",
       type: "bar",
       height: 180,
-      toolbar: {
-        show: false,
-      },
+      toolbar: { show: false },
     },
     plotOptions: {
       bar: {
@@ -24,35 +23,15 @@ export default function MonthlySalesChart() {
         borderRadiusApplication: "end",
       },
     },
-    dataLabels: {
-      enabled: false,
-    },
-    stroke: {
-      show: true,
-      width: 4,
-      colors: ["transparent"],
-    },
+    dataLabels: { enabled: false },
+    stroke: { show: true, width: 4, colors: ["transparent"] },
     xaxis: {
       categories: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
+        "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
+        "Juil", "Août", "Sep", "Oct", "Nov", "Déc",
       ],
-      axisBorder: {
-        show: false,
-      },
-      axisTicks: {
-        show: false,
-      },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
     },
     legend: {
       show: true,
@@ -61,36 +40,32 @@ export default function MonthlySalesChart() {
       fontFamily: "Outfit",
     },
     yaxis: {
-      title: {
-        text: undefined,
-      },
+      title: { text: "Nombre de CV acceptés" },
     },
     grid: {
-      yaxis: {
-        lines: {
-          show: true,
-        },
-      },
+      yaxis: { lines: { show: true } },
     },
-    fill: {
-      opacity: 1,
-    },
-
+    fill: { opacity: 1 },
     tooltip: {
-      x: {
-        show: false,
-      },
-      y: {
-        formatter: (val: number) => `${val}`,
-      },
+      x: { show: false },
+      y: { formatter: (val: number) => `${val} candidats` },
     },
   };
-  const series = [
-    {
-      name: "Sales",
-      data: [168, 385, 201, 298, 187, 195, 291, 110, 215, 390, 280, 112],
-    },
-  ];
+
+  // Données chargées depuis l'API (voir useEffect ci-dessous)
+  const [series, setSeries] = useState([
+    { name: "CV acceptés", data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  ]);
+  useEffect(() => {
+    fetchApi("/api/dashboard/monthly-chart")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error && Array.isArray(data.data))
+          setSeries([{ name: "CV acceptés", data: data.data }]);
+      })
+      .catch(() => {});
+  }, []);
+
   const [isOpen, setIsOpen] = useState(false);
 
   function toggleDropdown() {
@@ -100,32 +75,29 @@ export default function MonthlySalesChart() {
   function closeDropdown() {
     setIsOpen(false);
   }
+
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Monthly Sales
+          Analyse mensuelle des CV acceptés
         </h3>
         <div className="relative inline-block">
           <button className="dropdown-toggle" onClick={toggleDropdown}>
             <MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 size-6" />
           </button>
-          <Dropdown
-            isOpen={isOpen}
-            onClose={closeDropdown}
-            className="w-40 p-2"
-          >
+          <Dropdown isOpen={isOpen} onClose={closeDropdown} className="w-40 p-2">
             <DropdownItem
               onItemClick={closeDropdown}
               className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
             >
-              View More
+              Voir plus
             </DropdownItem>
             <DropdownItem
               onItemClick={closeDropdown}
               className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
             >
-              Delete
+              Supprimer
             </DropdownItem>
           </Dropdown>
         </div>

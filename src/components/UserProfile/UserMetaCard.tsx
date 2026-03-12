@@ -1,35 +1,112 @@
+import { useState, useEffect, useRef } from "react";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
+import { fetchApi, apiUrl, getStoredToken } from "../../api/config";
+import { useAvatarUrl } from "../../hooks/useAvatarUrl";
+import type { UserProfile } from "../../pages/UserProfiles";
 
-export default function UserMetaCard() {
+type Props = {
+  profile: UserProfile;
+  onUpdate?: () => void;
+};
+
+export default function UserMetaCard({ profile, onUpdate }: Props) {
   const { isOpen, openModal, closeModal } = useModal();
-  const handleSave = () => {
-    // Handle save logic here
-    console.log("Saving changes...");
-    closeModal();
+  const [fullName, setFullName] = useState(profile.fullName);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarUrl = useAvatarUrl(profile.avatarPath);
+
+  useEffect(() => {
+    setFullName(profile.fullName);
+  }, [profile.fullName]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetchApi("/api/users/me", {
+        method: "PATCH",
+        body: JSON.stringify({ fullName: fullName.trim() }),
+      });
+      if (res.ok) {
+        onUpdate?.();
+        closeModal();
+      }
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("avatar", file);
+      const token = getStoredToken();
+      if (!token) return;
+      const res = await fetch(apiUrl("/api/users/me/avatar"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      if (res.ok) {
+        onUpdate?.();
+      }
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const displayName = profile.fullName || profile.email || "Utilisateur";
+  const roleName = profile.roleName || "Recruteur";
+
   return (
     <>
       <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-col items-center w-full gap-6 xl:flex-row">
-            <div className="w-20 h-20 overflow-hidden border border-gray-200 rounded-full dark:border-gray-800">
-              <img src="/images/user/owner.jpg" alt="user" />
+            <div className="relative group">
+              <label className="cursor-pointer block">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                  disabled={uploading}
+                />
+                <div className="w-20 h-20 overflow-hidden border border-gray-200 rounded-full dark:border-gray-800 bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl font-semibold text-brand-600 dark:text-brand-400">
+                      {(displayName || "U").charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-medium">
+                  {uploading ? "..." : "Changer"}
+                </span>
+              </label>
             </div>
             <div className="order-3 xl:order-2">
               <h4 className="mb-2 text-lg font-semibold text-center text-gray-800 dark:text-white/90 xl:text-left">
-                Musharof Chowdhury
+                {displayName}
               </h4>
               <div className="flex flex-col items-center gap-1 text-center xl:flex-row xl:gap-3 xl:text-left">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Team Manager
+                  {roleName}
                 </p>
                 <div className="hidden h-3.5 w-px bg-gray-300 dark:bg-gray-700 xl:block"></div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Arizona, United States
+                  {profile.email}
                 </p>
               </div>
             </div>
@@ -146,86 +223,42 @@ export default function UserMetaCard() {
         <div className="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-11">
           <div className="px-2 pr-14">
             <h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Edit Personal Information
+              Modifier vos informations
             </h4>
             <p className="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
-              Update your details to keep your profile up-to-date.
+              Ces informations proviennent de votre inscription et peuvent être mises à jour.
             </p>
           </div>
-          <form className="flex flex-col">
-            <div className="custom-scrollbar h-[450px] overflow-y-auto px-2 pb-3">
+          <form className="flex flex-col" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+            <div className="px-2 pb-3">
               <div>
                 <h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">
-                  Social Links
+                  Informations personnelles
                 </h5>
-
                 <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div>
-                    <Label>Facebook</Label>
-                    <Input
-                      type="text"
-                      value="https://www.facebook.com/PimjoHQ"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>X.com</Label>
-                    <Input type="text" value="https://x.com/PimjoHQ" />
-                  </div>
-
-                  <div>
-                    <Label>Linkedin</Label>
-                    <Input
-                      type="text"
-                      value="https://www.linkedin.com/company/pimjo"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Instagram</Label>
-                    <Input type="text" value="https://instagram.com/PimjoHQ" />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-7">
-                <h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">
-                  Personal Information
-                </h5>
-
-                <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>First Name</Label>
-                    <Input type="text" value="Musharof" />
-                  </div>
-
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Last Name</Label>
-                    <Input type="text" value="Chowdhury" />
-                  </div>
-
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Email Address</Label>
-                    <Input type="text" value="randomuser@pimjo.com" />
-                  </div>
-
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Phone</Label>
-                    <Input type="text" value="+09 363 398 46" />
-                  </div>
-
                   <div className="col-span-2">
-                    <Label>Bio</Label>
-                    <Input type="text" value="Team Manager" />
+                    <Label>Nom complet</Label>
+                    <Input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Votre nom"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Email</Label>
+                    <Input type="text" value={profile.email} disabled className="opacity-70" />
+                    <p className="mt-1 text-xs text-gray-500">L&apos;email ne peut pas être modifié ici.</p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
-              <Button size="sm" variant="outline" onClick={closeModal}>
-                Close
+              <Button type="button" size="sm" variant="outline" onClick={closeModal}>
+                Annuler
               </Button>
-              <Button size="sm" onClick={handleSave}>
-                Save Changes
+              <Button type="submit" size="sm" onClick={handleSave} disabled={saving}>
+                {saving ? "Enregistrement..." : "Enregistrer"}
               </Button>
             </div>
           </form>
