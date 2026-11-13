@@ -1,192 +1,73 @@
-# TailAdmin React - Free React Tailwind Admin Dashboard Template
+# Genesis — analyse de CV et suivi des recrutements
 
-TailAdmin is a free and open-source admin dashboard template built on **React and Tailwind CSS**, providing developers
-with everything they need to create a comprehensive, data-driven back-end,
-dashboard, or admin panel solution for upcoming web projects.
+Genesis lit des CV dans tous les formats courants, en extrait un profil structuré, le compare aux critères d'une offre et produit un score sur 100, expliqué critère par critère. Chaque compte a ses propres offres, analyses, candidats et historique.
 
-With TailAdmin, you get access to all the necessary dashboard UI components, elements, and pages required to build a
-feature-rich and complete dashboard or admin panel. Whether you're building dashboard or admin panel for a complex web
-application or a simple website, TailAdmin is the perfect solution to help you get up and running quickly.
+## Architecture
 
-![TailAdmin React.js Dashboard Preview](./banner.png)
+```
+Navigateur ──► Vite :5173 ──/api──► API Node/Express :3000 ──► PostgreSQL
+                                         │
+                                         └──► Moteur d'analyse Python :5001 (local)
+                                              règles + GLiNER + multilingual-e5 (ONNX) + Tesseract OCR (optionnel)
+```
 
-## Overview
-
-TailAdmin provides essential UI components and layouts for building feature-rich, data-driven admin dashboards and
-control panels. It's built on:
-
-- React 19
-- TypeScript
-- Tailwind CSS
-
-### Quick Links
-
-- [✨ Visit Website](https://tailadmin.com)
-- [📄 Documentation](https://tailadmin.com/docs)
-- [⬇️ Download](https://tailadmin.com/download)
-- [🖌️ Figma Design File (Community Edition)](https://www.figma.com/community/file/1214477970819985778)
-- [⚡ Get PRO Version](https://tailadmin.com/pricing)
-
-### Demos
-
-- [Free Version](https://free-react-demo.tailadmin.com/)
-- [Pro Version](https://react-demo.tailadmin.com)
-
-### Other Versions
-
-- [HTML Version](https://github.com/TailAdmin/tailadmin-free-tailwind-dashboard-template)
-- [Next.js Version](https://github.com/TailAdmin/free-nextjs-admin-dashboard)
-- [Vue.js Version](https://github.com/TailAdmin/vue-tailwind-admin-dashboard)
+| Dossier | Rôle |
+|---|---|
+| `src/` | Interface React 19 + TypeScript |
+| `Backend/` | API : authentification, isolation par compte, offres, candidats, analyses, entretiens, tableau de bord |
+| `Analyse/` | Moteur d'analyse (modèles ONNX locaux) : extraction multi-format, référentiel de compétences, expérience, diplômes, langues, score |
+| `ml-space/` | Variante hébergée (Space Hugging Face, nécessite un abonnement PRO) |
+| `training/` | Notebook Colab/Kaggle de fine-tuning du modèle GLiNER sur des CV |
 
 ## Installation
 
-### Prerequisites
-
-To get started with TailAdmin, ensure you have the following prerequisites installed and set up:
-
-- Node.js 18.x or later (recommended to use Node.js 20.x or later)
-
-### Cloning the Repository
-
-Clone the repository using the following command:
+Prérequis : Node.js 20+, Python 3.11+, PostgreSQL 14+, ~1 Go de disque pour les modèles.
 
 ```bash
-git clone https://github.com/TailAdmin/free-react-tailwind-admin-dashboard.git
+npm install
+py -3 -m pip install -r Analyse/requirements.txt
 ```
 
-> Windows Users: place the repository near the root of your drive if you face issues while cloning.
+1. Créez la base : `psql -U postgres -c "CREATE DATABASE genesis"`.
+2. Copiez `Backend/.env.example` en `Backend/.env` et renseignez `DATABASE_URL`, `JWT_SECRET` (48+ caractères aléatoires) et `ANALYZER_KEY`.
+3. Copiez `Analyse/.env.example` en `Analyse/.env` avec la même `ANALYZER_KEY`.
+4. Lancez `demarrer-genesis.bat`. Les tables sont créées automatiquement au premier démarrage, ainsi que le compte par défaut défini par `DEFAULT_ACCOUNT_EMAIL` / `DEFAULT_ACCOUNT_PASSWORD`.
 
-1. Install dependencies:
+### Modèles d'IA (locaux, gratuits)
 
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+Les modèles tournent sur le PC (ONNX Runtime, CPU) : aucune donnée de CV ne quitte la machine.
 
-   > Use the `--legacy-peer-deps` flag, if you face issues while installing.
+```bash
+py -3 -I scripts/download_models.py     # modèles de base dans %LOCALAPPDATA%\Genesis\models
+py -3 -I scripts/download_models.py --gliner NickCdr/genesis-gliner-cv-onnx --dir gliner-ft   # modèle fine-tuné (1,2 Go)
+# puis GENESIS_GLINER=gliner-ft/model.onnx dans Analyse/.env
+```
 
-2. Start the development server:
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
+| Modèle | Rôle | Mesure (banc `Analyse/tests/bench_ner.py`) |
+|---|---|---|
+| **`NickCdr/genesis-gliner-cv-onnx`** (privé, fp32) — `gliner_multi-v2.1` fine-tuné sur des CV FR/EN (`training/`) | personnes, entreprises, postes, villes | F1 0,94 (sélection) · 0,98 (CV jamais vus) · ~2 s/CV |
+| `urchade/gliner_multi-v2.1` (fp16, Apache-2.0) — modèle de base, conservé en secours | idem | F1 0,91 · 0,98 · ~4 s/CV |
+| `intfloat/multilingual-e5-small` (int8, MIT) | adéquation CV ↔ offre, synonymes de compétences | ~1 s/CV |
 
-## Components
+- Mode rapide (moins précis, F1 0,82, ~1 s/CV) : téléchargez `knowledgator/gliner-x-small` (`onnx/model_quantized.onnx`) dans `models/gliner-x/` et ajoutez `GENESIS_GLINER=gliner-x/model_quantized.onnx` dans `Analyse/.env`.
+- **N'utilisez pas** la version int8 de `gliner_multi` : la quantification la rend aveugle (mesuré : 0 entité).
+- OCR des scans et des images : installez [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) avec le pack de langue française ; il est détecté automatiquement.
+- Sans modèles, l'analyse fonctionne en mode règles seules.
+- Fine-tuning : `training/finetune_gliner_cv.ipynb` (Colab/Kaggle GPU gratuit) publie un modèle privé et son export ONNX fp32 (la conversion fp16 est défectueuse pour DeBERTa), à installer avec la commande ci-dessus.
 
-TailAdmin is a pre-designed starting point for building a web-based dashboard using React.js and Tailwind CSS. The
-template includes:
+## Tests
 
-- Sophisticated and accessible sidebar
-- Data visualization components
-- Prebuilt profile management and 404 page
-- Tables and Charts(Line and Bar)
-- Authentication forms and input elements
-- Alerts, Dropdowns, Modals, Buttons and more
-- Can't forget Dark Mode 🕶️
+```bash
+npm test                 # API : fonctionnel + attaques (base genesis_test créée automatiquement)
+npm run test:analyzer    # moteur : 10 formats, faux positifs, zip bomb, XXE + tests par propriétés (Hypothesis)
+py -3 -I tests-e2e/e2e.py # parcours complet dans Chrome (E2E_EMAIL / E2E_PASSWORD), services démarrés
+npm run lint && npm run build
+```
 
-All components are built with React and styled using Tailwind CSS for easy customization.
+## Sécurité
 
-## Feature Comparison
-
-### Free Version
-
-- 1 Unique Dashboard
-- 30+ dashboard components
-- 50+ UI elements
-- Basic Figma design files
-- Community support
-
-### Pro Version
-
-- 5 Unique Dashboards: Analytics, Ecommerce, Marketing, CRM, Stocks (more coming soon)
-- 400+ dashboard components and UI elements
-- Complete Figma design file
-- Email support
-
-To learn more about pro version features and pricing, visit our [pricing page](https://tailadmin.com/pricing).
-
-## Changelog
-
-### Version 2.0.2 - [March 25, 2025]
-
-- Upgraded to React 19
-- Included overrides for packages to prevent peer dependency errors.
-- Migrated from react-flatpickr to flatpickr package for React 19 support
-
-### Version 2.0.1 - [February 27, 2025]
-
-#### Update Overview
-
-- Upgraded to Tailwind CSS v4 for better performance and efficiency.
-- Updated class usage to match the latest syntax and features.
-- Replaced deprecated class and optimized styles.
-
-#### Next Steps
-
-- Run npm install or yarn install to update dependencies.
-- Check for any style changes or compatibility issues.
-- Refer to the Tailwind CSS v4 [Migration Guide](https://tailwindcss.com/docs/upgrade-guide) on this release. if needed.
-- This update keeps the project up to date with the latest Tailwind improvements. 🚀
-
-### Version 2.0.0 - [February 2025]
-
-A major update with comprehensive redesign and modern React patterns implementation.
-
-#### Major Improvements
-
-- Complete UI redesign with modern React patterns
-- New features: collapsible sidebar, chat, and calendar
-- Improved performance and accessibility
-- Updated data visualization using ApexCharts
-
-#### Key Features
-
-- Redesigned dashboards (Ecommerce, Analytics, Marketing, CRM)
-- Enhanced navigation with React Router integration
-- Advanced tables with sorting and filtering
-- Calendar with drag-and-drop support
-- New UI components and improved existing ones
-
-#### Breaking Changes
-
-- Updated sidebar component API
-- Migrated charts to ApexCharts
-- Revised authentication system
-
-[Read more](https://tailadmin.com/docs/update-logs/react) on this release.
-
-### Version 1.3.7 - [June 20, 2024]
-
-#### Enhancements
-
-1. Remove Repetition of DefaultLayout in every Pages
-2. Add ClickOutside Component for reduce repeated functionality in Header Message, Notification and User Dropdowns.
-
-### Version 1.3.6 - [Jan 31, 2024]
-
-#### Enhancements
-
-1. Integrate flatpickr in [Date Picker/Form Elements]
-2. Change color after select an option [Select Element/Form Elements].
-3. Make it functional [Multiselect Dropdown/Form Elements].
-4. Make best value editable [Pricing Table One/Pricing Table].
-5. Rearrange Folder structure.
-
-### Version 1.2.0 - [Apr 28, 2023]
-
-- Add Typescript in TailAdmin React.
-
-### Version 1.0.0 - Initial Release - [Mar 13, 2023]
-
-- Initial release of TailAdmin React.
-
-## License
-
-TailAdmin React.js Free Version is released under the MIT License.
-
-## Support
-
-If you find this project helpful, please consider giving it a star on GitHub. Your support helps us continue developing
-and maintaining this template.
+- Session par cookie `httpOnly` + `SameSite=Strict`, en-tête anti-CSRF, jeton révoqué au changement de mot de passe.
+- Verrouillage après 5 échecs de connexion, limitation de débit, mots de passe bcrypt (coût 12).
+- Requêtes SQL exclusivement paramétrées ; chaque requête est bornée à `owner_id` (aucun accès aux données d'un autre compte).
+- Fichiers : type vérifié par signature binaire, nom aléatoire sur disque, protection zip bomb et XXE, téléchargement forcé en pièce jointe.
+- RGPD : critères discriminatoires (âge, etc.) refusés ; purge automatique des candidats inactifs (24 mois par défaut, réglable) ; droit à l'effacement.

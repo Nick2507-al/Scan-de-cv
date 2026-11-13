@@ -1,22 +1,17 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import svgr from "vite-plugin-svgr";
 
-// https://vite.dev/config/
+// /api est relayé vers le backend : même origine pour le navigateur → cookie de session SameSite=Strict.
 export default defineConfig({
+  plugins: [react()],
   server: {
     port: 5173,
-    open: false,
+    strictPort: true,
+    proxy: { "/api": { target: "http://127.0.0.1:3000", changeOrigin: false } },
   },
-  plugins: [
-    react(),
-    svgr({
-      svgrOptions: {
-        icon: true,
-        // This will transform your SVG to a React component
-        exportType: "named",
-        namedExport: "ReactComponent",
-      },
-    }),
-  ],
+  preview: {
+    port: 4173,
+    proxy: { "/api": { target: "http://127.0.0.1:3000", changeOrigin: false } },
+  },
+  build: { sourcemap: false, chunkSizeWarningLimit: 600 },
 });

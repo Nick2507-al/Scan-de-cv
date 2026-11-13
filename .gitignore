@@ -29,3 +29,17 @@ dist-ssr
 # Secrets et config locale
 .env
 Epic/free-react-tailwind-admin-dashboard/Analyse/.env
+
+# Genesis
+Backend/uploads/
+.pytest_cache/
+__pycache__/
+*.pyc
+training/genesis-gliner*/
+Analyse/models/
+tests-e2e/captures/
+
+# Ressources locales (non versionnées)
+/design/
+/.claude/
+.hypothesis/

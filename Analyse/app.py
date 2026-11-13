@@ -1,124 +1,125 @@
-import os
-import tempfile
+"""
+Moteur d'analyse de CV Genesis — service HTTP interne (appelé uniquement par le backend Node).
+
+  GET  /health       état du service et des modèles distants
+  POST /v1/analyze   multipart : file, criteria (JSON) → profil structuré + évaluation
+"""
+from __future__ import annotations
+
+import hmac
 import json
-from flask import Flask, request, jsonify
-from werkzeug.utils import secure_filename
+import logging
+import os
+import sys
+from pathlib import Path
+
 from dotenv import load_dotenv
+from flask import Flask, jsonify, request
 
-load_dotenv()
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+load_dotenv(ROOT / ".env")
 
-from nlp_utils import extract_text_from_pdf, extract_text_from_docx, analyze_text
-from cv_evaluation import evaluate_cv
-from flask_cors import CORS
+from genesis_analyzer.extract import SUPPORTED_EXTENSIONS, ExtractionError  # noqa: E402
+from genesis_analyzer.ml import MLClient  # noqa: E402
+from genesis_analyzer.local_ml import LocalML  # noqa: E402
+from genesis_analyzer.pipeline import analyze  # noqa: E402
+
+logging.basicConfig(level=logging.INFO, format="[analyzer] %(levelname)s %(message)s")
+log = logging.getLogger("analyzer")
+
+API_KEY = os.environ.get("ANALYZER_KEY", "")
+MAX_MB = int(os.environ.get("MAX_FILE_MB", "15"))
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])
+app.config["MAX_CONTENT_LENGTH"] = (MAX_MB + 1) * 1024 * 1024
+# Modèles locaux (ONNX) si présents, sinon service distant, sinon règles seules.
+_local = LocalML()
+ml = _local if _local.configured and os.environ.get("ML_MODE", "auto") != "remote" else MLClient()
 
-ALLOWED_EXTENSIONS = {"pdf", "docx"}
+def _warmup():
+    """Charge les modèles et compile les motifs en arrière-plan : la 1re analyse n'attend pas ~45 s."""
+    import threading
 
-
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def _get_skills_list(criteria_data):
-    if not criteria_data:
-        return []
-    if isinstance(criteria_data, dict) and "skills" in criteria_data:
-        s = criteria_data["skills"]
-        if isinstance(s, str) and s.strip():
-            return [x.strip() for x in s.split(",") if x.strip()]
-        if isinstance(s, list):
-            return s
-    if isinstance(criteria_data, list):
-        return criteria_data
-    return []
-
-
-@app.route("/analyze", methods=["POST"])
-def analyze():
-    files = request.files.getlist("file")
-    if not files or (len(files) == 1 and files[0].filename == ""):
-        file = request.files.get("file")
-        if file and file.filename:
-            files = [file]
-        else:
-            return jsonify({"error": "Fichier(s) manquant(s)"}), 400
-
-    criteria_raw = request.form.get("criteria")
-    try:
-        criteria_data = json.loads(criteria_raw) if criteria_raw else {}
-    except Exception:
-        return jsonify({"error": "Format criteria invalide (JSON attendu)"}), 400
-    if criteria_data is not None and not isinstance(criteria_data, (dict, list)):
-        return jsonify({"error": "Format criteria invalide"}), 400
-    criteria_data = criteria_data or {}
-
-    skills_list = _get_skills_list(criteria_data)
-    hf_token = os.environ.get("HF_TOKEN", "").strip()
-    results = []
-
-    for file in files:
-        if not file or not file.filename:
-            continue
-        if not allowed_file(file.filename):
-            results.append({
-                "filename": file.filename,
-                "error": "Type de fichier non supporté (PDF ou DOCX uniquement)",
-            })
-            continue
-
-        filename = secure_filename(file.filename)
-        temp_dir = tempfile.mkdtemp()
-        file_path = os.path.join(temp_dir, filename)
-
+    def run():
         try:
-            file.save(file_path)
+            sample = ("Jean Exemple\nComptable\nParis\njean@example.com\nEXPÉRIENCE\nComptable chez Exemple SA 2019 - 2023\n"
+                      "COMPÉTENCES\nExcel, Sage").encode()
+            analyze("warmup.txt", sample, {"requiredSkills": ["Excel"], "description": "Comptable"}, ml=ml)
+            log.info("modèles prêts")
+        except Exception:  # noqa: BLE001
+            log.exception("préchauffage échoué (l'analyse reste possible)")
+    threading.Thread(target=run, daemon=True, name="warmup").start()
 
-            if filename.lower().endswith(".pdf"):
-                text = extract_text_from_pdf(file_path)
-            else:
-                text = extract_text_from_docx(file_path)
 
-            if not text.strip():
-                results.append({
-                    "filename": filename,
-                    "error": "Impossible d'extraire le texte de ce fichier.",
-                })
-                continue
+CRITERIA_KEYS = {"jobTitle", "description", "requiredSkills", "niceSkills", "languages",
+                 "minExperienceYears", "minEducationLevel", "threshold"}
 
-            analysis = analyze_text(text, skills_list, hf_token=hf_token)
-            retained, improvement_notes = evaluate_cv(analysis, criteria_data)
 
-            results.append({
-                "filename": filename,
-                "emails": analysis.get("emails", []),
-                "phones": analysis.get("phones", []),
-                "skills": analysis.get("skills", []),
-                "persons": analysis.get("persons", []),
-                "organizations": analysis.get("organizations", []),
-                "retained": retained,
-                "improvement_notes": improvement_notes,
-            })
-        except Exception as e:
-            results.append({
-                "filename": filename,
-                "error": str(e),
-            })
-        finally:
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                if os.path.exists(temp_dir):
-                    os.rmdir(temp_dir)
-            except Exception:
-                pass
+def _criteria(raw: str | None) -> dict:
+    data = json.loads(raw) if raw else {}
+    if not isinstance(data, dict):
+        raise ValueError("criteria doit être un objet JSON")
+    out = {k: data[k] for k in CRITERIA_KEYS if k in data}
+    for k in ("requiredSkills", "niceSkills", "languages"):
+        v = out.get(k, [])
+        if isinstance(v, str):
+            v = [x.strip() for x in v.split(",")]
+        out[k] = [str(x).strip()[:80] for x in v if str(x).strip()][:80] if isinstance(v, list) else []
+    out["jobTitle"] = str(out.get("jobTitle", ""))[:200]
+    out["description"] = str(out.get("description", ""))[:20000]
+    out["minExperienceYears"] = max(0.0, min(60.0, float(out.get("minExperienceYears") or 0)))
+    out["minEducationLevel"] = max(0, min(8, int(out.get("minEducationLevel") or 0)))
+    out["threshold"] = max(0, min(100, int(out.get("threshold", 60))))
+    return out
 
-    if not results:
-        return jsonify({"error": "Aucun fichier valide à analyser"}), 400
 
-    return jsonify({"results": results})
+@app.before_request
+def _auth():
+    if request.path == "/health":
+        return None
+    if API_KEY and not hmac.compare_digest(request.headers.get("X-Analyzer-Key", ""), API_KEY):
+        return jsonify({"error": "Accès refusé"}), 401
+    return None
+
+
+@app.get("/health")
+def health():
+    return jsonify({"ok": True, "formats": SUPPORTED_EXTENSIONS, "ml": ml.health()})
+
+
+@app.post("/v1/analyze")
+def analyze_route():
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "Fichier manquant"}), 400
+    try:
+        criteria = _criteria(request.form.get("criteria"))
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return jsonify({"error": "Critères invalides"}), 400
+    data = file.read()
+    if not data:
+        return jsonify({"error": "Fichier vide"}), 400
+    try:
+        result = analyze(file.filename, data, criteria, ml=ml)
+    except ExtractionError as exc:
+        return jsonify({"error": str(exc)}), 422
+    except Exception:  # noqa: BLE001
+        log.exception("échec d'analyse pour %s", file.filename)
+        return jsonify({"error": "Erreur interne du moteur d'analyse"}), 500
+    log.info("%s → score %s (%s, %s ms)", file.filename, result["evaluation"]["score"], result["engine"], result["meta"]["durationMs"])
+    return jsonify(result)
+
+
+@app.errorhandler(413)
+def too_large(_e):
+    return jsonify({"error": f"Fichier trop volumineux (max {MAX_MB} Mo)"}), 413
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    from waitress import serve
+    host = os.environ.get("ANALYZER_HOST", "127.0.0.1")
+    port = int(os.environ.get("ANALYZER_PORT", "5001"))
+    log.info("démarrage sur http://%s:%s (modèles : %s)", host, port, "locaux ONNX" if isinstance(ml, LocalML) else (ml.base_url or "aucun, mode règles"))
+    _warmup()
+    serve(app, host=host, port=port, threads=6, channel_timeout=300)

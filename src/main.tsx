@@ -1,24 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { initBrowserLogger } from "./utils/browserLogger";
-import "./index.css";
-
-initBrowserLogger();
-import "swiper/swiper-bundle.css";
-import "flatpickr/dist/flatpickr.css";
-import App from "./App.tsx";
-import { AppWrapper } from "./components/common/PageMeta.tsx";
-import { ThemeProvider } from "./context/ThemeContext.tsx";
-import { AuthProvider } from "./context/AuthContext.tsx";
+import App from "./App";
+import "./styles/genesis.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
-      <AuthProvider>
-        <AppWrapper>
-          <App />
-        </AppWrapper>
-      </AuthProvider>
-    </ThemeProvider>
+    <App />
   </StrictMode>,
 );
